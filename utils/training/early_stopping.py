@@ -14,9 +14,9 @@ class EarlyStopping:
             self.counter = 0
             model.save_pretrained(os.path.join(self.save_path, "model"))
             processor.save_pretrained(os.path.join(self.save_path, "processor"))
-            if self.verbose: logging.info(f"Loss улучшен. Сохраняем модель.")
+            if self.verbose: logging.info(f"Loss has been improved\nSaving model")
         else:
             self.counter += 1
-            if self.verbose: logging.info(f"Нет улучшений: {self.counter}/{self.patience}")
+            if self.verbose: logging.info(f"No improvements: {self.counter}/{self.patience}")
             if self.counter >= self.patience:
                 self.early_stop = True

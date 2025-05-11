@@ -40,11 +40,15 @@ def create_plot_metrics(root, train_losses, val_losses, cer_scores, wer_scores):
     plt.close()
 
 def get_next_save_path(versions_dir):
+    if not os.path.exists(versions_dir):
+        os.makedirs(versions_dir)
+
     versions_num_list = [
         int(v_num[1:]) for v_num in os.listdir(versions_dir)
         if v_num.startswith('v') and v_num[1:].isdigit()
     ]
     max_num = max(versions_num_list) if versions_num_list else 0
 
-    return f"v{max_num + 1}"
+    next_version = f"v{max_num + 1}"
+    return os.path.join(versions_dir, next_version)
 
