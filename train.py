@@ -4,7 +4,7 @@ import signal
 import logging
 from utils.data.dataset import HandwrittenTextDataset
 from utils.training.early_stopping import EarlyStopping
-from utils.argparser import parse_args
+from utils.argparser import parse_train_args
 from utils.helpers import create_signal_handler, create_plot_metrics, get_next_save_path
 from utils.training.checkpoint import save_checkpoint, load_checkpoint
 from utils.seed import set_seed
@@ -26,7 +26,7 @@ if __name__ == "__main__":
         datefmt='%Y-%m-%d %H:%M:%S'
     )
 
-    args = parse_args()
+    args = parse_train_args()
     data_root = args.data
     root = os.path.dirname(os.path.abspath(__file__))
     version_dir = get_next_save_path(os.path.join(root, "versions"))

@@ -4,6 +4,7 @@ import torch
 import pandas as pd
 from PIL import Image, UnidentifiedImageError, ImageEnhance
 from torch.utils.data import Dataset
+from utils.image.resize import resize_with_aspect_and_padding
 from concurrent.futures import ThreadPoolExecutor
 from torchvision.transforms import functional as TF
 
@@ -65,7 +66,7 @@ class HandwrittenTextDataset(Dataset):
         return image
 
     def __getitem__(self, idx):
-        image = Image.open(self.images[idx]).convert("RGB").resize((384, 384))
+        image = resize_with_aspect_and_padding(Image.open(self.images[idx]).convert("RGB"))
         if self.augment:
             image = self.augment_image(image)
         encoding = self.processor(images=image, text=self.texts[idx], return_tensors="pt", padding="max_length",
