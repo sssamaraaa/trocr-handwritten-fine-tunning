@@ -1,7 +1,8 @@
 import torch
 import os
 
-def save_checkpoint(path, model, processor, optimizer, scheduler, scaler, epoch, train_losses, val_losses, cer_scores, wer_scores):
+def save_checkpoint(path_last, path_checkpoint, model, processor, optimizer, scheduler, scaler,
+                    epoch, train_losses, val_losses, cer_scores, wer_scores):
     checkpoint = {
         'epoch': epoch,
         'model_state_dict': model.state_dict(),
@@ -14,16 +15,20 @@ def save_checkpoint(path, model, processor, optimizer, scheduler, scaler, epoch,
         'wer_scores': wer_scores,
     }
 
-    torch.save(checkpoint, os.path.join(path, 'checkpoint.pth'))
-    model.save_pretrained(os.path.join(path, "model"))
-    processor.save_pretrained(os.path.join(path, "processor"))
+    # Сохраняем сам checkpoint.pth отдельно
+    torch.save(checkpoint, os.path.join(path_last, 'checkpoint.pth'))         # последняя версия
+    torch.save(checkpoint, os.path.join(path_checkpoint, 'checkpoint.pth'))   # резервная копия
 
-def load_checkpoint(path, model, processor, optimizer, scheduler, scaler):
+    # Сохраняем модель и процессор в "last"
+    model.save_pretrained(os.path.join(path_last, "model"))
+    processor.save_pretrained(os.path.join(path_last, "processor"))
+
+
+def load_checkpoint(path, model, optimizer, scheduler, scaler):
     checkpoint_path = os.path.join(path, 'checkpoint.pth')
-    checkpoint = torch.load(checkpoint_path)
+    checkpoint = torch.load(checkpoint_path, map_location='cpu')
 
     model.load_state_dict(checkpoint['model_state_dict'])
-    processor.load_pretrained(os.path.join(path, "processor"))
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
     scaler.load_state_dict(checkpoint['scaler_state_dict'])
