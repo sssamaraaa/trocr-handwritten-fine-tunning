@@ -12,7 +12,7 @@ def create_signal_handler(model, processor, epoch_completed, last_save_path):
 
     return handler
 
-def create_plot_metrics(root, train_losses, val_losses, cer_scores, wer_scores):
+def create_plot_metrics(root, train_losses, val_losses, cer_scores, wer_scores, version_dir):
     from matplotlib import pyplot as plt
     plt.figure(figsize=(12, 6))
     plt.subplot(1, 2, 1)
@@ -34,9 +34,9 @@ def create_plot_metrics(root, train_losses, val_losses, cer_scores, wer_scores):
     plt.grid(True)
 
     plt.tight_layout()
-    graphs_dir = os.path.join(root, "graphs")
+    graphs_dir = os.path.join(root, "metrics")
     os.makedirs(graphs_dir, exist_ok=True)
-    plt.savefig(os.path.join(graphs_dir, "training_metrics.png"))
+    plt.savefig(os.path.join(graphs_dir, f"training_metrics{version_dir}.png"))
     plt.close()
 
 def get_next_save_path(versions_dir):
