@@ -1,7 +1,7 @@
 import random
 import os
 import torch
-import pandas as pd
+import csv
 import numpy as np
 import io
 import cv2
@@ -14,25 +14,34 @@ from torchvision.transforms import functional as TF
 
 
 class HandwrittenTextDataset(Dataset):
-    def __init__(self, image_dir, annotation_file, processor, max_length=50, augment=False):
+    def __init__(self, image_dir, annotation_file, processor, max_new_tokens=40, augment=False):
         self.processor = processor
-        self.max_length = max_length
+        self.max_new_tokens = max_new_tokens
         self.augment = augment
-        df = pd.read_csv(annotation_file, sep='\t', header=None, names=['filename', 'text'])
-        df['full_path'] = df['filename'].apply(lambda x: os.path.join(image_dir, x))
 
-        def is_valid(row):
+        with open(annotation_file, 'r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            texts, names = [], []
+
+            for row in reader:
+                if len(row) >= 2:
+                    text = row[0].strip()
+                    name = row[1].strip().replace('"', '').replace("'", '')  # удаляем мусор
+                    texts.append(text)
+                    names.append(os.path.join(image_dir, name))
+
+        def is_valid(path):
             try:
-                Image.open(row['full_path']).convert("RGB")
+                Image.open(path).convert("RGB")
                 return True
             except (FileNotFoundError, UnidentifiedImageError):
                 return False
 
         with ThreadPoolExecutor() as executor:
-            valid_mask = list(executor.map(is_valid, [row for _, row in df.iterrows()]))
+            valid_mask = list(executor.map(is_valid, names))
 
-        self.images = df['full_path'][valid_mask].tolist()
-        self.texts = df['text'][valid_mask].tolist()
+        self.images = [img for img, valid in zip(names, valid_mask) if valid]
+        self.texts = [txt for txt, valid in zip(texts, valid_mask) if valid]
 
     def apply_perspective(self, image):
         image_np = np.array(image)
@@ -104,10 +113,13 @@ class HandwrittenTextDataset(Dataset):
         image = resize_with_aspect_and_padding(Image.open(self.images[idx]).convert("RGB"))
         if self.augment:
             image = self.augment_image(image)
-        encoding = self.processor(images=image, text=self.texts[idx], return_tensors="pt", padding="max_length",
-                                  truncation=True, max_length=self.max_length)
+        encoding = self.processor(images=image, text=self.texts[idx], return_tensors="pt", padding="max_new_tokens",
+                                  truncation=True, max_length=self.max_new_tokens)
         return {
             "pixel_values": encoding.pixel_values.squeeze(),
             "labels": encoding.labels.squeeze(),
             "text": self.texts[idx]
         }
+
+    def __len__(self):
+        return len(self.images)
