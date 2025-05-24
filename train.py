@@ -15,6 +15,8 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tqdm import tqdm
 from torch.cuda.amp import GradScaler, autocast
 import evaluate
+import pandas as pd
+from sklearn.model_selection import train_test_split
 
 
 if __name__ == "__main__":
@@ -29,17 +31,34 @@ if __name__ == "__main__":
     args = parse_train_args()
     data_root = args.data
     root = os.path.dirname(os.path.abspath(__file__))
-    version_dir = get_next_save_path(os.path.join(root, "versions"))
-    last_save_path = os.path.join(version_dir, "last")
-    checkpoint_path = os.path.join(version_dir, "checkpoint")
-    os.makedirs(version_dir, exist_ok=True)
-    os.makedirs(last_save_path, exist_ok=True)
-    os.makedirs(checkpoint_path, exist_ok=True)
 
-    train_dir = os.path.join(data_root, "train", "images_train")
-    train_labels = os.path.join(data_root, "train", "train.tsv")
-    val_dir = os.path.join(data_root, "test", "images_test")
-    val_labels = os.path.join(data_root, "test", "test.tsv")
+    if args.cont:
+        version_dir = args.cont
+        path_last = os.path.join(version_dir, "last")
+        path_checkpoint = os.path.join(version_dir, "checkpoint")
+        logging.info(f"Continuing training from version: {version_dir}")
+    else:
+        version_dir = get_next_save_path(os.path.join(root, "versions"))
+        path_last = os.path.join(version_dir, "last")
+        path_checkpoint = os.path.join(version_dir, "checkpoint")
+        os.makedirs(version_dir, exist_ok=True)
+        os.makedirs(path_last, exist_ok=True)
+        os.makedirs(path_checkpoint, exist_ok=True)
+        logging.info(f"Starting new training run at: {version_dir}")
+
+    train_csv = os.path.join(data_root, "train.csv")
+    images_path = os.path.join(data_root, "images")
+
+    df = pd.read_csv(train_csv, header=0, encoding="utf-8-sig")
+    df = df[["text", "name"]]
+    train_df, val_df = train_test_split(df, test_size=0.2, random_state=42)
+    logging.info("Пример строки из train:")
+    logging.info(train_df.iloc[0])
+
+    tmp_train_csv = os.path.join(version_dir, "train_split.csv")
+    tmp_val_csv = os.path.join(version_dir, "val_split.csv")
+    train_df.to_csv(tmp_train_csv, index=False, header=False)
+    val_df.to_csv(tmp_val_csv, index=False, header=False)
 
     processor = TrOCRProcessor.from_pretrained("microsoft/trocr-base-handwritten")
     model = VisionEncoderDecoderModel.from_pretrained("microsoft/trocr-base-handwritten")
@@ -49,29 +68,30 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    train_ds = HandwrittenTextDataset(train_dir, train_labels, processor, augment=True)
-    val_ds = HandwrittenTextDataset(val_dir, val_labels, processor, augment=False)
+    train_ds = HandwrittenTextDataset(images_path, tmp_train_csv, processor, augment=True)
+    val_ds = HandwrittenTextDataset(images_path, tmp_val_csv, processor, augment=False)
     train_dl = DataLoader(train_ds, batch_size=8, shuffle=True, num_workers=4, pin_memory=True)
     val_dl = DataLoader(val_ds, batch_size=8, num_workers=4, pin_memory=True)
 
     optimizer = AdamW(model.parameters(), lr=2e-5, weight_decay=0.01)
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.8, patience=2, verbose=True, min_lr=1e-6)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.8, patience=2, verbose=True, min_lr=1e-7)
     scaler = GradScaler()
-    early_stopping = EarlyStopping(patience=3, save_path=os.path.join(version_dir, "best_model"))
+    early_stopping = EarlyStopping(patience=3, save_path=os.path.join(version_dir, "best"))
 
     metric_cer = evaluate.load("cer")
     metric_wer = evaluate.load("wer")
 
     if args.cont:
         logging.info("Loading model from a checkpoint...")
-        load_checkpoint(checkpoint_path, model, processor, optimizer, scheduler, scaler)
+        epoch_completed, train_losses, val_losses, cer_scores, wer_scores = load_checkpoint(path_checkpoint, model, optimizer, scheduler, scaler)
+        processor = TrOCRProcessor.from_pretrained(os.path.join(path_checkpoint, "processor"))
+    else:
+        epoch_completed = 0
+        train_losses, val_losses, cer_scores, wer_scores = [], [], [], []
 
-    epoch_completed = 0
-    signal.signal(signal.SIGINT, create_signal_handler(model, processor, epoch_completed, last_save_path))
-    train_losses, val_losses = [], []
-    cer_scores, wer_scores = [], []
+    signal.signal(signal.SIGINT, create_signal_handler(model, processor, epoch_completed, path_last))
 
-    for epoch in range(args.epochs):
+    for epoch in range(epoch_completed, args.epochs):
         model.train()
         running_loss = 0
         loop = tqdm(train_dl, desc=f"[Epoch {epoch + 1}] Training")
@@ -92,7 +112,6 @@ if __name__ == "__main__":
             running_loss += loss.item()
             loop.set_postfix(loss=loss.item())
 
-        epoch_completed += 1
         avg_train_loss = running_loss / len(train_dl)
         train_losses.append(avg_train_loss)
 
@@ -127,7 +146,8 @@ if __name__ == "__main__":
 
         scheduler.step(avg_val_loss)
 
-        save_checkpoint(last_save_path, model, processor, optimizer, scheduler, scaler, epoch_completed, train_losses,
+        # Сохраняем чекпоинт в обе папки (last и checkpoint)
+        save_checkpoint(path_last, path_checkpoint, model, processor, optimizer, scheduler, scaler, epoch + 1, train_losses,
                         val_losses, cer_scores, wer_scores)
 
         early_stopping(avg_val_loss, model, processor)
@@ -135,8 +155,9 @@ if __name__ == "__main__":
             logging.info("Early stopping!")
             break
 
-    model.save_pretrained(os.path.join(last_save_path, "model"))
-    processor.save_pretrained(os.path.join(last_save_path, "processor"))
+    # Сохраняем финальную модель и процессор
+    model.save_pretrained(os.path.join(path_last, "model"))
+    processor.save_pretrained(os.path.join(path_last, "processor"))
     logging.info("The training has been successfully completed!")
 
-    create_plot_metrics(root, train_losses, val_losses, cer_scores, wer_scores)
+    create_plot_metrics(root, train_losses, val_losses, cer_scores, wer_scores, version_dir)
