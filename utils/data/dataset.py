@@ -14,9 +14,9 @@ from torchvision.transforms import functional as TF
 
 
 class HandwrittenTextDataset(Dataset):
-    def __init__(self, image_dir, annotation_file, processor, max_new_tokens=40, augment=False):
+    def __init__(self, image_dir, annotation_file, processor, max_length=40, augment=False):
         self.processor = processor
-        self.max_new_tokens = max_new_tokens
+        self.max_length = max_length
         self.augment = augment
 
         with open(annotation_file, 'r', encoding='utf-8') as f:
@@ -113,8 +113,8 @@ class HandwrittenTextDataset(Dataset):
         image = resize_with_aspect_and_padding(Image.open(self.images[idx]).convert("RGB"))
         if self.augment:
             image = self.augment_image(image)
-        encoding = self.processor(images=image, text=self.texts[idx], return_tensors="pt", padding="max_new_tokens",
-                                  truncation=True, max_length=self.max_new_tokens)
+        encoding = self.processor(images=image, text=self.texts[idx], return_tensors="pt", padding="max_length",
+                                  truncation=True, max_length=self.max_length)
         return {
             "pixel_values": encoding.pixel_values.squeeze(),
             "labels": encoding.labels.squeeze(),
