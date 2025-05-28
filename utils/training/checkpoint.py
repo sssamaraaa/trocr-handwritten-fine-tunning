@@ -1,10 +1,9 @@
 import torch
 import os
 
-def save_checkpoint(path_last, path_checkpoint, model, processor, optimizer, scheduler, scaler,
+def save_checkpoint(path_last, model, processor, optimizer, scheduler, scaler,
                     epoch, train_losses, val_losses, cer_scores, wer_scores):
     os.makedirs(path_last, exist_ok=True)
-    os.makedirs(path_checkpoint, exist_ok=True)
 
     checkpoint = {
         'epoch': epoch,
@@ -19,7 +18,6 @@ def save_checkpoint(path_last, path_checkpoint, model, processor, optimizer, sch
     }
 
     torch.save(checkpoint, os.path.join(path_last, 'checkpoint.pth'))
-    torch.save(checkpoint, os.path.join(path_checkpoint, 'checkpoint.pth'))
 
     model.save_pretrained(os.path.join(path_last, "model"))
     processor.save_pretrained(os.path.join(path_last, "processor"))
