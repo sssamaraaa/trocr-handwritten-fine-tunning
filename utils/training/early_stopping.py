@@ -1,5 +1,5 @@
 class EarlyStopping:
-    def __init__(self, patience=3, verbose=True, save_path="best_model"):
+    def __init__(self, patience=3, verbose=True, save_path="best"):
         self.patience = patience
         self.counter = 0
         self.best_loss = float('inf')
