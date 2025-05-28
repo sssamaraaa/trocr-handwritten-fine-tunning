@@ -73,8 +73,8 @@ if __name__ == "__main__":
     train_dl = DataLoader(train_ds, batch_size=8, shuffle=True, num_workers=4, pin_memory=True)
     val_dl = DataLoader(val_ds, batch_size=8, num_workers=4, pin_memory=True)
 
-    optimizer = AdamW(model.parameters(), lr=2e-5, weight_decay=0.01)
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.8, patience=2, verbose=True, min_lr=1e-7)
+    optimizer = AdamW(model.parameters(), lr=1e-5, weight_decay=0.01)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.8, patience=2, verbose=True, min_lr=1e-8)
     scaler = GradScaler()
     early_stopping = EarlyStopping(patience=3, save_path=os.path.join(version_dir, "best"))
 
@@ -82,7 +82,12 @@ if __name__ == "__main__":
     metric_wer = evaluate.load("wer")
 
     if args.cont:
-        logging.info("Loading model from a checkpoint...")
+        version_dir = args.cont
+        path_last = os.path.join(version_dir, "last")
+        path_checkpoint = os.path.join(version_dir, "checkpoint")
+
+        logging.info(f"Continuing training from version: {version_dir}")
+
         epoch_completed, train_losses, val_losses, cer_scores, wer_scores = load_checkpoint(path_checkpoint, model, optimizer, scheduler, scaler)
         processor = TrOCRProcessor.from_pretrained(os.path.join(path_checkpoint, "processor"))
     else:
@@ -146,7 +151,6 @@ if __name__ == "__main__":
 
         scheduler.step(avg_val_loss)
 
-        # Сохраняем чекпоинт в обе папки (last и checkpoint)
         save_checkpoint(path_last, path_checkpoint, model, processor, optimizer, scheduler, scaler, epoch + 1, train_losses,
                         val_losses, cer_scores, wer_scores)
 
@@ -155,7 +159,6 @@ if __name__ == "__main__":
             logging.info("Early stopping!")
             break
 
-    # Сохраняем финальную модель и процессор
     model.save_pretrained(os.path.join(path_last, "model"))
     processor.save_pretrained(os.path.join(path_last, "processor"))
     logging.info("The training has been successfully completed!")
