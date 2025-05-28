@@ -26,7 +26,7 @@ class HandwrittenTextDataset(Dataset):
             for row in reader:
                 if len(row) >= 2:
                     text = row[0].strip()
-                    name = row[1].strip().replace('"', '').replace("'", '')  # удаляем мусор
+                    name = row[1].strip().replace('"', '').replace("'", '')  
                     texts.append(text)
                     names.append(os.path.join(image_dir, name))
 
