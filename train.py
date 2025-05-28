@@ -81,7 +81,7 @@ if __name__ == "__main__":
     optimizer = AdamW(model.parameters(), lr=1e-5, weight_decay=0.01)
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.8, patience=2, verbose=True, min_lr=1e-8)
     scaler = GradScaler()
-    early_stopping = EarlyStopping(patience=3, save_path=os.path.join(save_version_dir, "best_model"))
+    early_stopping = EarlyStopping(patience=3, save_path=os.path.join(save_version_dir, "best"))
 
     metric_cer = evaluate.load("cer")
     metric_wer = evaluate.load("wer")
