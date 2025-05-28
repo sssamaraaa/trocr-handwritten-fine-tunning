@@ -63,3 +63,4 @@ and the previous folder will remain intact.
 
 ### License
 This project is licensed under the MIT License.
+This project makes use of the [TrOCR](https://huggingface.co/microsoft/trocr-base-handwritten) model by Microsoft:
