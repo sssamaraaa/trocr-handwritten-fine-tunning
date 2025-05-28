@@ -38,6 +38,8 @@ The annotations CSV file must contain two columns: `text` and `name`, where:
 - `text` is the label (e.g. handwritten content)
 - `name` is the corresponding image filename
 
+Example line from `train.csv`: `Hello world,image_001.jpg`
+
 ## Metrics
 During training, the following metrics are calculated:
 * CER (Character Error Rate) is an indicator of errors at the character level.
